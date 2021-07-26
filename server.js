@@ -18,7 +18,8 @@ app.get("/products", (req, res) => {
             'name',
             'price',
             'createdAt',
-            'seller'
+            'seller',
+            'imageUrl'
         ]
     })
         .then((result) => {
