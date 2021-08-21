@@ -2,12 +2,31 @@ const express = require('express'); //모듈 불러오기
 const cors = require('cors')
 const app = express();
 const models = require('./models');
+const multer = require('multer');
+// 저장 앤 파일 내가 원하는 걸로 저장
+const upload = multer({
+    storage: multer.diskStorage({
+        destination: function (req, file, cb) {
+            cb(null, 'uploads/')
+        },
+        filename: function (req, file, cb) {
+            cb(null, file.originalname)
+        }
+    })
+})
 const port = 8080;
 
 //익스프레스 사용 제이슨 형식을 사용하기
 app.use(express.json())
 //모든 브라우저에서 내 서버에 요청 가능
 app.use(cors());
+// 사진 올렸을 때 이미지 안깨지게
+app.use('/uploads', express.static('uploads'))
+// 배너 관리
+app.get('/banners', (req, res) => {
+
+})
+
 
 //람다 기존 함수 대신 겟오면 이 함수 실행
 app.get("/products", (req, res) => {
@@ -39,9 +58,9 @@ app.post("/products", (req, res) => {
     res.send({
         body,
     });
-    const { id, name, description, price, seller } = body;
-    if (!id, !name || !description || !price || !seller) {
-        res.send("모든 필드를 입력해주세요");
+    const { id, name, description, price, seller, imageUrl } = body;
+    if (!id, !name || !description || !price || !seller || !imageUrl) {
+        res.status(400).send("모든 필드를 입력해주세요");
     }
     models.Product.create({
         id,
@@ -49,6 +68,7 @@ app.post("/products", (req, res) => {
         description,
         price,
         seller,
+        imageUrl
     })
         .then((result) => {
             console.log("상품 생성 결과 : ", result);
@@ -58,7 +78,7 @@ app.post("/products", (req, res) => {
         })
         .catch((error) => {
             console.error(error);
-            res.send("상품 업로드에 문제가 발생했습니다");
+            res.status(400).send("상품 업로드에 문제가 발생했습니다");
         });
 });
 
@@ -75,7 +95,7 @@ app.delete("/products", (req, res) => {
     })
         .catch((error) => {
             console.error(error);
-            res.send("상품 삭제에 문제가 발생했습니다");
+            res.status(400).send("상품 삭제에 문제가 발생했습니다");
         });
 });
 
@@ -93,7 +113,17 @@ app.get("/products/:id", (req, res) => {
         })
     }).catch((error) => {
         console.error(error);
-        res.send("상품 조회 에러 발생")
+        res.status(400).send("상품 조회 에러 발생")
+    })
+})
+
+// 파일을 하나 보낼 때 싱글
+// 이미지 파일에 데이터 요청이 왔을 때 업로드라는 폴더에 이미지 조장
+app.post("/image", upload.single("image"), (req, res) => {
+    const file = req.file
+    console.log(file);
+    res.send({
+        imageUrl: file.path
     })
 })
 
