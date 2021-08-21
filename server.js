@@ -22,10 +22,21 @@ app.use(express.json())
 app.use(cors());
 // 사진 올렸을 때 이미지 안깨지게
 app.use('/uploads', express.static('uploads'))
-// 배너 관리
-app.get('/banners', (req, res) => {
+app.get("/banners", (req, res) => {
+    models.Banner.findAll({
+        limit: 2,
+    })
+        .then((result) => {
+            res.send({
+                banners: result,
+            });
+        })
+        .catch((error) => {
+            console.error(error);
+            res.status(500).send("에러가 발생했습니다");
+        });
+});
 
-})
 
 
 //람다 기존 함수 대신 겟오면 이 함수 실행
