@@ -1,34 +1,178 @@
-var http = require("http");
-var hostname = "127.0.0.1";
-var port = 8080;
-
-//서버에서 요청이 왔을 때 호출되는 함수 응답받는거 응답주는거
-const server = http.createServer(function (req, res) {
-    // 요청 나눠서 사용 
-    const path = req.url;
-    const method = req.method;
-    // 패스가 프로덕츠일때 겟일때 등등 다 나눠서 작성
-    if (path === "/products") {
-        if (method === "GET") {
-            // 배열을 보내줘야할땐 writehead사용 정상적인 상황이니 200 컨텐트 타입은 제이슨형식의 구조를 보내겠다 선언
-            res.writeHead(200, { "Content-Type": "application/json" });
-            //배열을 스트링 형태로 바꿔주는 것
-            const products = JSON.stringify([
-                {
-                    name: "농구공",
-                    price: 5000,
-                },
-            ]);
-            res.end(products);
-        } else if (method === "POST") {
-            res.end("생성되었습니다!");
+const express = require('express'); //모듈 불러오기
+const cors = require('cors')
+const app = express();
+const models = require('./models');
+const multer = require('multer');
+// 저장 앤 파일 내가 원하는 걸로 저장
+const upload = multer({
+    storage: multer.diskStorage({
+        destination: function (req, file, cb) {
+            cb(null, 'uploads/')
+        },
+        filename: function (req, file, cb) {
+            cb(null, file.originalname)
         }
-    } else {
-        res.end("Good Bye");
-    }
+    })
+})
+// 히루쿠에서 알아서 하는거 있으면 그거 써라
+const port = process.env.PORT || 8080;
+
+//익스프레스 사용 제이슨 형식을 사용하기
+app.use(express.json())
+//모든 브라우저에서 내 서버에 요청 가능
+app.use(cors());
+// 사진 올렸을 때 이미지 안깨지게
+app.use('/uploads', express.static('uploads'))
+app.get("/banners", (req, res) => {
+    models.Banner.findAll({
+        limit: 2,
+    })
+        .then((result) => {
+            res.send({
+                banners: result,
+            });
+        })
+        .catch((error) => {
+            console.error(error);
+            res.status(500).send("에러가 발생했습니다");
+        });
 });
 
-// 요청을 기다리고 있겠다.
-server.listen(port, hostname);
 
-console.log("grab market server on!");
+
+//람다 기존 함수 대신 겟오면 이 함수 실행
+app.get("/products", (req, res) => {
+    models.Product.findAll({
+        order: [["createdAt", "DESC"]],
+        attributes: [
+            'id',
+            'name',
+            'price',
+            'createdAt',
+            'seller',
+            'imageUrl',
+            'soldout'
+        ]
+    })
+        .then((result) => {
+            console.log("PRODUCTS : ", result);
+            res.send({
+                products: result,
+            });
+        })
+        .catch((error) => {
+            console.error(error);
+            res.send("에러 발생");
+        });
+});
+
+app.post("/products", (req, res) => {
+    const body = req.body;
+    res.send({
+        body,
+    });
+    const { id, name, description, price, seller, imageUrl } = body;
+    if (!id, !name || !description || !price || !seller || !imageUrl) {
+        res.status(400).send("모든 필드를 입력해주세요");
+    }
+    models.Product.create({
+        id,
+        name,
+        description,
+        price,
+        seller,
+        imageUrl
+    })
+        .then((result) => {
+            console.log("상품 생성 결과 : ", result);
+            res.send({
+                result,
+            });
+        })
+        .catch((error) => {
+            console.error(error);
+            res.status(400).send("상품 업로드에 문제가 발생했습니다");
+        });
+});
+
+app.delete("/products", (req, res) => {
+    const body = req.body;
+    const { id } = body;
+    models.Product.destroy({
+        where: {
+            "id": id
+        }
+    }).then((result) => {
+        console.log(id + "번째 상품이 삭제 되었습니다.");
+        res.send(id + "번째 상품이 삭제 되었습니다.");
+    })
+        .catch((error) => {
+            console.error(error);
+            res.status(400).send("상품 삭제에 문제가 발생했습니다");
+        });
+});
+
+app.get("/products/:id", (req, res) => {
+    const params = req.params;
+    const { id } = params;
+    models.Product.findOne({
+        where: {
+            id: id
+        }
+    }).then((result) => {
+        console.log("PRODUCT : ", result);
+        res.send({
+            product: result
+        })
+    }).catch((error) => {
+        console.error(error);
+        res.status(400).send("상품 조회 에러 발생")
+    })
+})
+
+// 파일을 하나 보낼 때 싱글
+// 이미지 파일에 데이터 요청이 왔을 때 업로드라는 폴더에 이미지 조장
+app.post("/image", upload.single("image"), (req, res) => {
+    const file = req.file
+    console.log(file);
+    res.send({
+        imageUrl: file.path
+    })
+})
+
+app.post("/purchase/:id", (req, res) => {
+    const { id } = req.params;
+    models.Product.update(
+        {
+            soldout: 1,
+        },
+        {
+            where: {
+                id,
+            },
+        }
+    )
+        .then((result) => {
+            res.send({
+                result: true,
+            });
+        })
+        .catch((error) => {
+            console.error(error);
+            res.status(500).send("에러가 발생했습니다.");
+        });
+});
+
+
+// 기다리는중
+app.listen(port, () => {
+    console.log("서버 돌아가는중");
+    //모델스에 넣은 테이블을 가져오겠다.
+    models.sequelize.sync().then(() => {
+        console.log("디비 연결 성공");
+    }).catch((err) => {
+        console.error(err);
+        console.log("디비 연결 에러")
+        process.exit()
+    })
+})
